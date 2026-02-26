@@ -72,17 +72,14 @@ def generate_pdf(mission_text, date_str, child_name):
     pdf = FPDF()
     pdf.add_page()
     pdf.add_font("Nanum", fname=font_path)
-
     pdf.set_fill_color(99, 179, 237)
     pdf.rect(0, 0, 210, 25, 'F')
     pdf.set_text_color(255, 255, 255)
     pdf.set_font("Nanum", size=16)
     pdf.set_y(7)
     pdf.cell(0, 10, f"  {child_name}의 학습 파트너  |  {date_str}", align="L")
-
     pdf.set_text_color(30, 30, 30)
     pdf.set_y(32)
-
     lines = mission_text.split('\n')
     for line in lines:
         clean = line.replace('**', '').replace('*', '').strip()
@@ -110,23 +107,21 @@ def generate_pdf(mission_text, date_str, child_name):
             pdf.set_font("Nanum", size=11)
             pdf.set_fill_color(255, 255, 255)
             pdf.multi_cell(0, 6, clean)
-
     return bytes(pdf.output())
 
 
-# ── 파닉스 스케줄 (주차별 순환) ──
 PHONICS_SCHEDULE = [
     {"pattern": "단모음 a (short a)", "words": ["cat", "map", "bag", "hat", "fan"], "hint": "가운데 a 소리가 '애'"},
     {"pattern": "단모음 i (short i)", "words": ["pig", "big", "hit", "sit", "win"], "hint": "가운데 i 소리가 '이'"},
     {"pattern": "장모음 a_e (magic e)", "words": ["cake", "game", "name", "make", "late"], "hint": "끝에 e가 붙으면 가운데 a가 '에이'"},
     {"pattern": "이중자음 bl, cl, fl", "words": ["black", "block", "clap", "clock", "flag"], "hint": "두 자음이 합쳐진 소리"},
     {"pattern": "이중자음 sh, ch, th", "words": ["shop", "chip", "that", "ship", "chat"], "hint": "두 글자가 하나의 소리"},
-    {"pattern": "이중모음 oo", "words": ["moon", "food", "cool", "pool", "boost"], "hint": "oo = '우' 긴 소리"},
+    {"pattern": "이중모음 oo (long)", "words": ["moon", "food", "cool", "pool", "boost"], "hint": "oo = '우' 긴 소리"},
 ]
 
 
 def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
-    """초등학생용 과제 생성 (파닉스 포함)"""
+    """초등학생용 과제 생성 (파닉스 10문제 포함)"""
     today = datetime.now()
     theme = DAY_THEMES[today.weekday()]
     date_str = today.strftime("%m월 %d일")
@@ -148,29 +143,33 @@ def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
 
     adhd_note = "ADHD 아이라서 집중 시간이 짧아요. 문제마다 게임 보상 언급 필수." if child.get("adhd") else ""
 
-    # 주차별로 파닉스 패턴 순환
     week_num = today.isocalendar()[1]
     phonics = PHONICS_SCHEDULE[week_num % len(PHONICS_SCHEDULE)]
     phonics_words = ", ".join(phonics["words"])
 
     response = client.messages.create(
         model="claude-opus-4-6",
-        max_tokens=1800,
+        max_tokens=2200,
         system=(
             f"당신은 '레오'입니다.\n"
             f"초등학교 {child['grade']}학년 아이 '{child['name']}'의 AI 학습 친구예요.\n"
             f"{adhd_note}\n\n"
             f"[과제 만들기 규칙]\n"
-            f"- 총 35분 이내 끝낼 수 있는 양 ({level_guide[level]})\n"
+            f"- 총 40분 이내 끝낼 수 있는 양 ({level_guide[level]})\n"
             f"- {game_desc} 모든 문제를 포장하기\n"
             f"- 구성: 🔤 파닉스 -> 🎮 영어 -> ➕ 수학 -> ✏️ 국어 -> 🎁 보너스 순서\n\n"
-            f"[🔤 파닉스 섹션 규칙]\n"
+            f"[🔤 파닉스 섹션 규칙] ← 반드시 문제 10개 정확히!\n"
             f"- 오늘의 파닉스 패턴: {phonics['pattern']}\n"
             f"- 연습 단어: {phonics_words}\n"
             f"- 힌트: {phonics['hint']}\n"
-            f"- 활동 1: 단어 읽기 + 한국어 뜻 맞추기 (3개)\n"
-            f"- 활동 2: 빈칸 채우기 문제 1개 (예: c__t = cat)\n"
-            f"- 활동 3: 게임 소재로 그 패턴 단어 만들기 1개\n\n"
+            f"- Q1~Q5: 단어 읽기 + 한국어 뜻 맞추기 (연습 단어 5개 전부 사용)\n"
+            f"  예) Q1. 'cat' 읽어봐! 뜻은? → 정답: 고양이 🐱\n"
+            f"- Q6~Q8: 빈칸 채우기 3문제 (예: c__t → cat, m__p → map)\n"
+            f"  각각 다른 연습 단어로 출제, 정답 표시\n"
+            f"- Q9: 패턴 단어 골라내기 - 보기 3단어 중 오늘 패턴에 맞는 것 1개 고르기\n"
+            f"  예) dog / cat / run 중 short a 패턴은? → cat\n"
+            f"- Q10: 게임 소재로 오늘 패턴 단어 직접 만들기 1개 (없으면 비슷한 패턴 단어)\n"
+            f"  예) 마인크래프트 속 'bat(박쥐)' → short a 패턴!\n\n"
             f"[🎮 영어 섹션 규칙]\n"
             f"- 게임 관련 단어 2개 + 짧은 문장 만들기\n\n"
             f"[➕ 수학 섹션 규칙]\n"
@@ -301,7 +300,6 @@ child_tabs = st.tabs([f"{'🎮' if c['type']=='elementary' else '🦕'} {c['name
 for idx, (child_tab, child) in enumerate(zip(child_tabs, CHILDREN)):
     with child_tab:
         is_preschool = child["type"] == "preschool"
-
         col_main, col_side = st.columns([4, 1])
 
         with col_side:
@@ -378,8 +376,8 @@ for idx, (child_tab, child) in enumerate(zip(child_tabs, CHILDREN)):
                             use_container_width=True,
                             key=f"dl_pdf_{idx}"
                         )
-                    except Exception as e:
-                        st.error(f"PDF 오류: {e}")
+                    except Exception:
+                        pass
 
                 st.divider()
                 st.subheader("📋 카카오톡 복사용")
