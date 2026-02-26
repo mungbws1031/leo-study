@@ -33,7 +33,6 @@ def load_children():
     if CHILDREN_FILE.exists():
         with open(CHILDREN_FILE, "r", encoding="utf-8") as f:
             return json.load(f)["children"]
-    # 기본값 (children.json 없을 때)
     return [
         {"id": "1", "name": "영인", "grade": "3", "type": "elementary", "adhd": True, "themes": ["마인크래프트", "로블록스"]},
         {"id": "2", "name": "영서", "grade": "유치원", "type": "preschool", "adhd": False, "themes": ["공룡"]}
@@ -44,7 +43,6 @@ CHILDREN = load_children()
 SAVE_DIR = pathlib.Path("과제기록")
 SAVE_DIR.mkdir(exist_ok=True)
 
-# 아이별 저장 폴더 생성
 for child in CHILDREN:
     (SAVE_DIR / child["name"]).mkdir(exist_ok=True)
 
@@ -71,7 +69,6 @@ def get_korean_font():
 
 def generate_pdf(mission_text, date_str, child_name):
     font_path = get_korean_font()
-
     pdf = FPDF()
     pdf.add_page()
     pdf.add_font("Nanum", fname=font_path)
@@ -118,7 +115,6 @@ def generate_pdf(mission_text, date_str, child_name):
 
 
 def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
-    """초등학생용 과제 생성"""
     today = datetime.now()
     theme = DAY_THEMES[today.weekday()]
     date_str = today.strftime("%m월 %d일")
@@ -172,7 +168,6 @@ def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
 
 
 def generate_mission_preschool(child, level="보통"):
-    """유치원생용 과제 생성"""
     today = datetime.now()
     date_str = today.strftime("%m월 %d일")
 
@@ -272,7 +267,6 @@ st.caption(
     f"{DAY_THEMES[today.weekday()]}"
 )
 
-# ── 아이 선택 탭 ──
 child_tabs = st.tabs([f"{'🎮' if c['type']=='elementary' else '🦕'} {c['name']}" for c in CHILDREN])
 
 for idx, (child_tab, child) in enumerate(zip(child_tabs, CHILDREN)):
@@ -355,8 +349,8 @@ for idx, (child_tab, child) in enumerate(zip(child_tabs, CHILDREN)):
                             use_container_width=True,
                             key=f"dl_pdf_{idx}"
                         )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        st.error(f"PDF 오류: {e}")
 
                 st.divider()
                 st.subheader("📋 카카오톡 복사용")
@@ -365,13 +359,12 @@ for idx, (child_tab, child) in enumerate(zip(child_tabs, CHILDREN)):
                 emoji = "🦕" if is_preschool else "🎮"
                 st.info(f"👆 버튼을 누르면 {child['name']}이의 오늘 {'활동' if is_preschool else '과제'}이 만들어져요! {emoji}")
 
-        # 리포트 & 기록
         st.divider()
         rep_col, rec_col = st.columns(2)
 
         with rep_col:
             st.subheader("📊 주간 리포트")
-            if st.button("리포트 생성", key=f"report_{idx}", type="primary"):
+            if st.button("리포트 생성", key=f"report_btn_{idx}", type="primary"):
                 with st.spinner("분석 중..."):
                     report = generate_parent_report(child["name"])
                     st.session_state[f"report_{idx}"] = report
