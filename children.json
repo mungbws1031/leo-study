@@ -1,0 +1,20 @@
+{
+  "children": [
+    {
+      "id": "1",
+      "name": "영인",
+      "grade": "3",
+      "type": "elementary",
+      "adhd": true,
+      "themes": ["마인크래프트", "로블록스"]
+    },
+    {
+      "id": "2",
+      "name": "영서",
+      "grade": "유치원",
+      "type": "preschool",
+      "adhd": false,
+      "themes": ["공룡"]
+    }
+  ]
+}
