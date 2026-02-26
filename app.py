@@ -1,18 +1,20 @@
 # -*- coding: utf-8 -*-
 import os
+import tempfile
 
-# Windows 한글 인코딩 오류 방지 (맨 위에서 설정해야 함)
+# Windows 한글 인코딩 오류 방지
 os.environ["PYTHONIOENCODING"] = "utf-8"
 
 import streamlit as st
 import anthropic
 import pathlib
+import requests
 from datetime import datetime
 from dotenv import load_dotenv
+from fpdf import FPDF
 
 load_dotenv(encoding="utf-8")
 
-# API 키 앞뒤 공백/특수문자 제거 (인코딩 오류 원인)
 api_key = os.getenv("ANTHROPIC_API_KEY", "").strip().strip('\ufeff')
 
 st.set_page_config(
@@ -39,7 +41,68 @@ DAY_THEMES = {
     6: "😴 휴식의 날"
 }
 
-def generate_mission(level="보통"):
+
+def get_korean_font():
+    font_path = os.path.join(tempfile.gettempdir(), "NanumGothic.ttf")
+    if not os.path.exists(font_path):
+        url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Regular.ttf"
+        r = requests.get(url, timeout=15)
+        with open(font_path, "wb") as f:
+            f.write(r.content)
+    return font_path
+
+
+def generate_pdf(mission_text, date_str):
+    font_path = get_korean_font()
+
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.add_font("Nanum", fname=font_path)
+    pdf.add_font("NanumB", fname=font_path)
+
+    # 헤더
+    pdf.set_fill_color(99, 179, 237)
+    pdf.rect(0, 0, 210, 25, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Nanum", size=16)
+    pdf.set_y(7)
+    pdf.cell(0, 10, f"  레오 학습 파트너  |  {date_str}", align="L")
+
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_y(32)
+
+    lines = mission_text.split('\n')
+    for line in lines:
+        clean = line.replace('**', '').replace('*', '').strip()
+        if line.startswith('# '):
+            pdf.set_font("Nanum", size=15)
+            pdf.set_fill_color(235, 245, 255)
+            pdf.multi_cell(0, 9, clean[2:] if clean.startswith('#') else clean, fill=True)
+            pdf.ln(1)
+        elif line.startswith('## '):
+            pdf.set_font("Nanum", size=13)
+            pdf.set_fill_color(255, 250, 230)
+            pdf.multi_cell(0, 8, clean[3:] if clean.startswith('#') else clean, fill=True)
+            pdf.ln(1)
+        elif line.startswith('### '):
+            pdf.set_font("Nanum", size=12)
+            pdf.set_fill_color(240, 255, 240)
+            pdf.multi_cell(0, 7, clean[4:] if clean.startswith('#') else clean, fill=True)
+        elif clean == '':
+            pdf.ln(3)
+        elif clean.startswith('---'):
+            pdf.set_draw_color(180, 180, 180)
+            pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+            pdf.ln(3)
+        else:
+            pdf.set_font("Nanum", size=11)
+            pdf.set_fill_color(255, 255, 255)
+            pdf.multi_cell(0, 6, clean)
+
+    return bytes(pdf.output())
+
+
+def generate_mission(level="보통", game_theme="랜덤"):
     today = datetime.now()
     theme = DAY_THEMES[today.weekday()]
     date_str = today.strftime("%m월 %d일")
@@ -53,6 +116,12 @@ def generate_mission(level="보통"):
         "어려움": "조금 도전적으로, 심화 문제 포함"
     }
 
+    game_guide = {
+        "랜덤": "마인크래프트 또는 로블록스 중 하나를 골라서",
+        "마인크래프트": "마인크래프트 소재만 사용해서",
+        "로블록스": "로블록스 소재만 사용해서"
+    }
+
     response = client.messages.create(
         model="claude-opus-4-6",
         max_tokens=1500,
@@ -61,12 +130,16 @@ def generate_mission(level="보통"):
             f"초등학교 {CHILD_GRADE}학년 ADHD 아이 '{CHILD_NAME}'의 AI 학습 친구예요.\n\n"
             f"[과제 만들기 규칙]\n"
             f"- 총 30분 이내 끝낼 수 있는 양 ({level_guide[level]})\n"
-            f"- 마인크래프트 또는 로블록스 상황으로 모든 문제를 포장하기\n"
+            f"- {game_guide[game_theme]} 모든 문제를 포장하기\n"
             f"- 구성: 영어 -> 수학 -> 국어 -> 보너스 순서\n"
             f"- 영어: 게임 관련 단어 3개 + 짧은 미션\n"
             f"- 수학: 게임 스토리 속 계산 문제\n"
             f"- 국어: 딱 3줄 글쓰기 (부담 없게)\n"
             f"- 보너스: 게임하면서 할 수 있는 미션\n\n"
+            f"[게임 소재 예시]\n"
+            f"- 마인크래프트: 크리퍼, 다이아몬드 광산, 엔더드래곤, 레드스톤, 마을 주민, 네더, 스켈레톤, 좀비\n"
+            f"- 로블록스: Adopt Me(애완동물/달걀/로벅스), Blox Fruits(악마의열매/해적/검사), "
+            f"Brookhaven(집꾸미기/자동차), Jailbreak(탈옥/경찰), 오비(장애물), 게임패스, 아바타, 트레이드\n\n"
             f"[말투 규칙]\n"
             f"- 친구처럼 반말\n"
             f"- 이모지 풍부하게 사용\n"
@@ -134,6 +207,7 @@ with st.sidebar:
     st.selectbox("학년", ["1학년","2학년","3학년","4학년","5학년","6학년"], index=2)
     st.divider()
     level = st.radio("오늘의 난이도", ["쉬움", "보통", "어려움"], index=1, horizontal=True)
+    game_theme = st.radio("게임 소재", ["랜덤", "마인크래프트", "로블록스"], index=0, horizontal=True)
     st.divider()
     st.header("📅 이번 주 완료")
     for i, day in enumerate(["월","화","수","목","금","토","일"]):
@@ -146,7 +220,7 @@ with tab1:
     with col1:
         if st.button("🎮 오늘 과제 만들기!", type="primary", use_container_width=True):
             with st.spinner("레오가 과제를 만들고 있어요... 🤔✨"):
-                mission = generate_mission(level)
+                mission = generate_mission(level, game_theme)
                 st.session_state.mission = mission
 
     with col2:
@@ -158,19 +232,38 @@ with tab1:
         st.divider()
         st.markdown(st.session_state.mission)
         st.divider()
-        col_a, col_b = st.columns(2)
+
+        col_a, col_b, col_c, col_d = st.columns(4)
         with col_a:
             if st.button("💾 저장하기", use_container_width=True):
                 save_mission(st.session_state.mission)
                 st.success("✅ 저장 완료!")
         with col_b:
             st.download_button(
-                "📥 다운로드",
+                "📥 TXT 다운로드",
                 data=st.session_state.mission,
                 file_name=f"과제_{today.strftime('%m%d')}.txt",
                 mime="text/plain",
                 use_container_width=True
             )
+        with col_c:
+            try:
+                pdf_data = generate_pdf(
+                    st.session_state.mission,
+                    today.strftime("%Y년 %m월 %d일")
+                )
+                st.download_button(
+                    "📄 PDF 다운로드",
+                    data=pdf_data,
+                    file_name=f"과제_{today.strftime('%m%d')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.button("📄 PDF (준비중)", disabled=True, use_container_width=True)
+        with col_d:
+            pass
+
         st.divider()
         st.subheader("📋 카카오톡 복사용")
         st.code(st.session_state.mission, language=None)
