@@ -114,7 +114,19 @@ def generate_pdf(mission_text, date_str, child_name):
     return bytes(pdf.output())
 
 
+# ── 파닉스 스케줄 (주차별 순환) ──
+PHONICS_SCHEDULE = [
+    {"pattern": "단모음 a (short a)", "words": ["cat", "map", "bag", "hat", "fan"], "hint": "가운데 a 소리가 '애'"},
+    {"pattern": "단모음 i (short i)", "words": ["pig", "big", "hit", "sit", "win"], "hint": "가운데 i 소리가 '이'"},
+    {"pattern": "장모음 a_e (magic e)", "words": ["cake", "game", "name", "make", "late"], "hint": "끝에 e가 붙으면 가운데 a가 '에이'"},
+    {"pattern": "이중자음 bl, cl, fl", "words": ["black", "block", "clap", "clock", "flag"], "hint": "두 자음이 합쳐진 소리"},
+    {"pattern": "이중자음 sh, ch, th", "words": ["shop", "chip", "that", "ship", "chat"], "hint": "두 글자가 하나의 소리"},
+    {"pattern": "이중모음 oo", "words": ["moon", "food", "cool", "pool", "boost"], "hint": "oo = '우' 긴 소리"},
+]
+
+
 def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
+    """초등학생용 과제 생성 (파닉스 포함)"""
     today = datetime.now()
     theme = DAY_THEMES[today.weekday()]
     date_str = today.strftime("%m월 %d일")
@@ -136,21 +148,37 @@ def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
 
     adhd_note = "ADHD 아이라서 집중 시간이 짧아요. 문제마다 게임 보상 언급 필수." if child.get("adhd") else ""
 
+    # 주차별로 파닉스 패턴 순환
+    week_num = today.isocalendar()[1]
+    phonics = PHONICS_SCHEDULE[week_num % len(PHONICS_SCHEDULE)]
+    phonics_words = ", ".join(phonics["words"])
+
     response = client.messages.create(
         model="claude-opus-4-6",
-        max_tokens=1500,
+        max_tokens=1800,
         system=(
             f"당신은 '레오'입니다.\n"
             f"초등학교 {child['grade']}학년 아이 '{child['name']}'의 AI 학습 친구예요.\n"
             f"{adhd_note}\n\n"
             f"[과제 만들기 규칙]\n"
-            f"- 총 30분 이내 끝낼 수 있는 양 ({level_guide[level]})\n"
+            f"- 총 35분 이내 끝낼 수 있는 양 ({level_guide[level]})\n"
             f"- {game_desc} 모든 문제를 포장하기\n"
-            f"- 구성: 영어 -> 수학 -> 국어 -> 보너스 순서\n"
-            f"- 영어: 게임 관련 단어 3개 + 짧은 미션\n"
-            f"- 수학: 게임 스토리 속 계산 문제\n"
-            f"- 국어: 딱 3줄 글쓰기 (부담 없게)\n"
-            f"- 보너스: 게임하면서 할 수 있는 미션\n\n"
+            f"- 구성: 🔤 파닉스 -> 🎮 영어 -> ➕ 수학 -> ✏️ 국어 -> 🎁 보너스 순서\n\n"
+            f"[🔤 파닉스 섹션 규칙]\n"
+            f"- 오늘의 파닉스 패턴: {phonics['pattern']}\n"
+            f"- 연습 단어: {phonics_words}\n"
+            f"- 힌트: {phonics['hint']}\n"
+            f"- 활동 1: 단어 읽기 + 한국어 뜻 맞추기 (3개)\n"
+            f"- 활동 2: 빈칸 채우기 문제 1개 (예: c__t = cat)\n"
+            f"- 활동 3: 게임 소재로 그 패턴 단어 만들기 1개\n\n"
+            f"[🎮 영어 섹션 규칙]\n"
+            f"- 게임 관련 단어 2개 + 짧은 문장 만들기\n\n"
+            f"[➕ 수학 섹션 규칙]\n"
+            f"- 게임 스토리 속 계산 문제\n\n"
+            f"[✏️ 국어 섹션 규칙]\n"
+            f"- 딱 3줄 글쓰기 (부담 없게)\n\n"
+            f"[🎁 보너스]\n"
+            f"- 게임하면서 할 수 있는 미션\n\n"
             f"[게임 소재]\n"
             f"- 마인크래프트: 크리퍼, 다이아몬드, 엔더드래곤, 레드스톤\n"
             f"- 로블록스: Adopt Me, Blox Fruits, Brookhaven, Jailbreak, 로벅스\n\n"
@@ -168,6 +196,7 @@ def generate_mission_elementary(child, level="보통", game_theme="랜덤"):
 
 
 def generate_mission_preschool(child, level="보통"):
+    """유치원생용 과제 생성"""
     today = datetime.now()
     date_str = today.strftime("%m월 %d일")
 
